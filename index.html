@@ -1,0 +1,54 @@
+const LIFF_ID = '2012273086-9FqH4X6N';
+const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzI_55D28bG0QPD6CbkfBobVEtuaNc1NhHTGO7NFzTrDJpmK3QiU0DWN2qJRgBuBhoHrA/exec';
+
+document.getElementById('submitBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('submitBtn');
+  const status = document.getElementById('status');
+  const roomType = getSelectedRoom();
+
+  if (!roomType) {
+    status.textContent = '請先選擇「男祈禱室」或「女祈禱室」。';
+    return;
+  }
+  if (!compressedBase64) {
+    status.textContent = '請先選擇或拍攝一張照片。';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '上傳中...';
+  status.textContent = '';
+
+  try {
+    const res = await fetch(GAS_WEB_APP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        roomType,
+        userId: profile.userId,
+        userName: profile.displayName,
+        note: document.getElementById('noteInput').value.trim(),
+        imageBase64: compressedBase64
+      })
+    });
+
+    const result = await res.json();
+    if (result.success) {
+      status.textContent = result.message || '上傳完成！';
+      document.getElementById('photoInput').value = '';
+      document.getElementById('noteInput').value = '';
+      document.getElementById('preview').style.display = 'none';
+      document.querySelectorAll('input[name="roomType"]').forEach((el) => {
+        el.checked = false;
+      });
+      compressedBase64 = '';
+    } else {
+      status.textContent = result.message || '上傳失敗';
+    }
+  } catch (err) {
+    status.textContent = '連線失敗：' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '送出上傳';
+  }
+});
