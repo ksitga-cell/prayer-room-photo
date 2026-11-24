@@ -1,54 +1,267 @@
-const LIFF_ID = '2012273086-W7Fdk3TT';
-const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzI_55D28bG0QPD6CbkfBobVEtuaNc1NhHTGO7NFzTrDJpmK3QiU0DWN2qJRgBuBhoHrA/exec';
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>祈禱室清潔照片上傳</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
+      max-width: 480px;
+      margin: 24px auto;
+      padding: 0 16px;
+      color: #222;
+      background: #fafafa;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+    h3 {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+    #userInfo {
+      font-size: 14px;
+      color: #4b5563;
+      margin-bottom: 16px;
+      padding: 8px 12px;
+      background: #f3f4f6;
+      border-radius: 8px;
+    }
+    .field {
+      margin-bottom: 16px;
+    }
+    label.title {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      font-size: 15px;
+    }
+    .radio-group {
+      display: flex;
+      gap: 12px;
+    }
+    .radio-option {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 15px;
+      transition: all 0.15s ease;
+    }
+    .radio-option:has(input:checked) {
+      border-color: #06c755;
+      background: #ecfdf3;
+      font-weight: 600;
+    }
+    input[type="file"],
+    input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 15px;
+    }
+    input[type="text"] {
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+    }
+    #preview {
+      max-width: 100%;
+      margin-top: 10px;
+      display: none;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+      background: #06c755;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+    #status {
+      margin-top: 14px;
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre-line;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h3>祈禱室清潔照片上傳</h3>
+    <div id="userInfo">正在連線 LINE...</div>
 
-document.getElementById('submitBtn').addEventListener('click', async () => {
-  const btn = document.getElementById('submitBtn');
-  const status = document.getElementById('status');
-  const roomType = getSelectedRoom();
+    <div class="field">
+      <label class="title">選擇祈禱室（必填）</label>
+      <div class="radio-group">
+        <label class="radio-option">
+          <input type="radio" name="roomType" value="男祈禱室" />
+          <span>男祈禱室</span>
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="roomType" value="女祈禱室" />
+          <span>女祈禱室</span>
+        </label>
+      </div>
+    </div>
 
-  if (!roomType) {
-    status.textContent = '請先選擇「男祈禱室」或「女祈禱室」。';
-    return;
-  }
-  if (!compressedBase64) {
-    status.textContent = '請先選擇或拍攝一張照片。';
-    return;
-  }
+    <div class="field">
+      <label class="title" for="photoInput">選擇或拍攝照片（必填）</label>
+      <input id="photoInput" type="file" accept="image/*" />
+      <img id="preview" alt="照片預覽" />
+    </div>
 
-  btn.disabled = true;
-  btn.textContent = '上傳中...';
-  status.textContent = '';
+    <div class="field">
+      <label class="title" for="noteInput">備註（選填）</label>
+      <input id="noteInput" type="text" placeholder="例如：地板清潔、垃圾清運完成" />
+    </div>
 
-  try {
-    const res = await fetch(GAS_WEB_APP_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({
-        roomType,
-        userId: profile.userId,
-        userName: profile.displayName,
-        note: document.getElementById('noteInput').value.trim(),
-        imageBase64: compressedBase64
-      })
+    <button id="submitBtn" disabled>送出上傳</button>
+    <div id="status"></div>
+  </div>
+
+  <script>
+    const LIFF_ID = '2012273086-W7Fdk3TT';
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzI_55D28bG0QPD6CbkfBobVEtuaNc1NhHTGO7NFzTrDJpmK3QiU0DWN2qJRgBuBhoHrA/exec';
+
+    let profile = { userId: '', displayName: '' };
+    let compressedBase64 = '';
+
+    async function initLiff() {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
+      profile = await liff.getProfile();
+      document.getElementById('userInfo').textContent = `LINE 暱稱：${profile.displayName}`;
+      document.getElementById('submitBtn').disabled = false;
+    }
+
+    function getSelectedRoom() {
+      const checked = document.querySelector('input[name="roomType"]:checked');
+      return checked ? checked.value : '';
+    }
+
+    function compressImage(file, maxWidth = 1600, quality = 0.8) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            let { width, height } = img;
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    document.getElementById('photoInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      const status = document.getElementById('status');
+      if (!file) return;
+
+      status.textContent = '正在處理照片...';
+      try {
+        compressedBase64 = await compressImage(file);
+        const preview = document.getElementById('preview');
+        preview.src = compressedBase64;
+        preview.style.display = 'block';
+        status.textContent = '';
+      } catch (err) {
+        status.textContent = '照片處理失敗：' + err.message;
+      }
     });
 
-    const result = await res.json();
-    if (result.success) {
-      status.textContent = result.message || '上傳完成！';
-      document.getElementById('photoInput').value = '';
-      document.getElementById('noteInput').value = '';
-      document.getElementById('preview').style.display = 'none';
-      document.querySelectorAll('input[name="roomType"]').forEach((el) => {
-        el.checked = false;
-      });
-      compressedBase64 = '';
-    } else {
-      status.textContent = result.message || '上傳失敗';
-    }
-  } catch (err) {
-    status.textContent = '連線失敗：' + err.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '送出上傳';
-  }
-});
+    document.getElementById('submitBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('submitBtn');
+      const status = document.getElementById('status');
+      const roomType = getSelectedRoom();
+
+      if (!roomType) {
+        status.textContent = '請先選擇「男祈禱室」或「女祈禱室」。';
+        return;
+      }
+      if (!compressedBase64) {
+        status.textContent = '請先選擇或拍攝一張照片。';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '上傳中...';
+      status.textContent = '';
+
+      try {
+        const res = await fetch(GAS_WEB_APP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            roomType,
+            userId: profile.userId,
+            userName: profile.displayName,
+            note: document.getElementById('noteInput').value.trim(),
+            imageBase64: compressedBase64
+          })
+        });
+
+        const result = await res.json();
+        if (result.success) {
+          status.textContent = result.message || '上傳完成！';
+          document.getElementById('photoInput').value = '';
+          document.getElementById('noteInput').value = '';
+          document.getElementById('preview').style.display = 'none';
+          document.querySelectorAll('input[name="roomType"]').forEach((el) => {
+            el.checked = false;
+          });
+          compressedBase64 = '';
+        } else {
+          status.textContent = result.message || '上傳失敗';
+        }
+      } catch (err) {
+        status.textContent = '連線失敗：' + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '送出上傳';
+      }
+    });
+
+    initLiff().catch((err) => {
+      document.getElementById('userInfo').textContent = 'LIFF 初始化失敗：' + err.message;
+    });
+  </script>
+</body>
+</html>
