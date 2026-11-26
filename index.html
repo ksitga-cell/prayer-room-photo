@@ -65,13 +65,35 @@
       background: #ecfdf3;
       font-weight: 600;
     }
-    input[type="file"],
+    .photo-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .btn-secondary {
+      flex: 1;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #1f2937;
+      background: #f3f4f6;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-clear {
+      padding: 10px 12px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #b91c1c;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      cursor: pointer;
+    }
     input[type="text"] {
       width: 100%;
       box-sizing: border-box;
       font-size: 15px;
-    }
-    input[type="text"] {
       padding: 10px 12px;
       border: 1px solid #d1d5db;
       border-radius: 8px;
@@ -89,7 +111,7 @@
       border-radius: 8px;
       border: 1px solid #e5e7eb;
     }
-    button {
+    #submitBtn {
       width: 100%;
       padding: 12px;
       font-size: 16px;
@@ -100,7 +122,7 @@
       border-radius: 8px;
       cursor: pointer;
     }
-    button:disabled {
+    #submitBtn:disabled {
       background: #9ca3af;
       cursor: not-allowed;
     }
@@ -133,8 +155,12 @@
     </div>
 
     <div class="field">
-      <label class="title" for="photoInput">選擇照片（可一次選多張，必填）</label>
-      <input id="photoInput" type="file" accept="image/*" multiple />
+      <label class="title">選擇或拍攝照片（可多次累加，必填）</label>
+      <input id="photoInput" type="file" accept="image/*" multiple style="display:none" />
+      <div class="photo-actions">
+        <button type="button" id="addPhotoBtn" class="btn-secondary">+ 新增照片</button>
+        <button type="button" id="clearPhotoBtn" class="btn-clear" style="display:none">清空重選</button>
+      </div>
       <div id="previewGrid"></div>
     </div>
 
@@ -196,27 +222,44 @@
       });
     }
 
+    function renderPreviews() {
+      const grid = document.getElementById('previewGrid');
+      const clearBtn = document.getElementById('clearPhotoBtn');
+      grid.innerHTML = '';
+      compressedImages.forEach((src, idx) => {
+        const imgEl = document.createElement('img');
+        imgEl.src = src;
+        imgEl.alt = `預覽第 ${idx + 1} 張`;
+        grid.appendChild(imgEl);
+      });
+      clearBtn.style.display = compressedImages.length > 0 ? 'inline-block' : 'none';
+    }
+
+    document.getElementById('addPhotoBtn').addEventListener('click', () => {
+      const input = document.getElementById('photoInput');
+      input.value = '';
+      input.click();
+    });
+
+    document.getElementById('clearPhotoBtn').addEventListener('click', () => {
+      compressedImages = [];
+      renderPreviews();
+      document.getElementById('status').textContent = '';
+    });
+
     document.getElementById('photoInput').addEventListener('change', async (e) => {
       const files = Array.from(e.target.files || []);
       const status = document.getElementById('status');
-      const grid = document.getElementById('previewGrid');
-      grid.innerHTML = '';
-      compressedImages = [];
-
       if (files.length === 0) return;
 
-      status.textContent = `正在處理 ${files.length} 張照片...`;
+      status.textContent = `正在處理新增的 ${files.length} 張照片...`;
       try {
         for (let i = 0; i < files.length; i++) {
           const base64 = await compressImage(files[i]);
           compressedImages.push(base64);
-
-          const imgEl = document.createElement('img');
-          imgEl.src = base64;
-          imgEl.alt = `預覽第 ${i + 1} 張`;
-          grid.appendChild(imgEl);
         }
-        status.textContent = `已準備好 ${compressedImages.length} 張照片。`;
+        renderPreviews();
+        status.textContent = `目前已累積 ${compressedImages.length} 張照片（可繼續按「+ 新增照片」）。`;
       } catch (err) {
         status.textContent = '照片處理失敗：' + err.message;
       }
@@ -271,13 +314,12 @@
         }
 
         status.textContent = `${roomType} 共 ${successCount} 張照片已記錄（人員：${lastPerson}）`;
-        document.getElementById('photoInput').value = '';
+        compressedImages = [];
+        renderPreviews();
         document.getElementById('noteInput').value = '';
-        document.getElementById('previewGrid').innerHTML = '';
         document.querySelectorAll('input[name="roomType"]').forEach((el) => {
           el.checked = false;
         });
-        compressedImages = [];
       } catch (err) {
         status.textContent = `已成功上傳 ${successCount} / ${compressedImages.length} 張，但發生錯誤：${err.message}`;
       } finally {
