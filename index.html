@@ -76,10 +76,16 @@
       border: 1px solid #d1d5db;
       border-radius: 8px;
     }
-    #preview {
-      max-width: 100%;
+    #previewGrid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
       margin-top: 10px;
-      display: none;
+    }
+    #previewGrid img {
+      width: 100%;
+      height: 140px;
+      object-fit: cover;
       border-radius: 8px;
       border: 1px solid #e5e7eb;
     }
@@ -127,9 +133,9 @@
     </div>
 
     <div class="field">
-      <label class="title" for="photoInput">選擇或拍攝照片（必填）</label>
-      <input id="photoInput" type="file" accept="image/*" />
-      <img id="preview" alt="照片預覽" />
+      <label class="title" for="photoInput">選擇照片（可一次選多張，必填）</label>
+      <input id="photoInput" type="file" accept="image/*" multiple />
+      <div id="previewGrid"></div>
     </div>
 
     <div class="field">
@@ -146,7 +152,7 @@
     const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzI_55D28bG0QPD6CbkfBobVEtuaNc1NhHTGO7NFzTrDJpmK3QiU0DWN2qJRgBuBhoHrA/exec';
 
     let profile = { userId: '', displayName: '' };
-    let compressedBase64 = '';
+    let compressedImages = [];
 
     async function initLiff() {
       await liff.init({ liffId: LIFF_ID });
@@ -191,17 +197,26 @@
     }
 
     document.getElementById('photoInput').addEventListener('change', async (e) => {
-      const file = e.target.files[0];
+      const files = Array.from(e.target.files || []);
       const status = document.getElementById('status');
-      if (!file) return;
+      const grid = document.getElementById('previewGrid');
+      grid.innerHTML = '';
+      compressedImages = [];
 
-      status.textContent = '正在處理照片...';
+      if (files.length === 0) return;
+
+      status.textContent = `正在處理 ${files.length} 張照片...`;
       try {
-        compressedBase64 = await compressImage(file);
-        const preview = document.getElementById('preview');
-        preview.src = compressedBase64;
-        preview.style.display = 'block';
-        status.textContent = '';
+        for (let i = 0; i < files.length; i++) {
+          const base64 = await compressImage(files[i]);
+          compressedImages.push(base64);
+
+          const imgEl = document.createElement('img');
+          imgEl.src = base64;
+          imgEl.alt = `預覽第 ${i + 1} 張`;
+          grid.appendChild(imgEl);
+        }
+        status.textContent = `已準備好 ${compressedImages.length} 張照片。`;
       } catch (err) {
         status.textContent = '照片處理失敗：' + err.message;
       }
@@ -211,48 +226,60 @@
       const btn = document.getElementById('submitBtn');
       const status = document.getElementById('status');
       const roomType = getSelectedRoom();
+      const note = document.getElementById('noteInput').value.trim();
 
       if (!roomType) {
         status.textContent = '請先選擇「男祈禱室」或「女祈禱室」。';
         return;
       }
-      if (!compressedBase64) {
-        status.textContent = '請先選擇或拍攝一張照片。';
+      if (compressedImages.length === 0) {
+        status.textContent = '請先選擇至少一張照片。';
         return;
       }
 
       btn.disabled = true;
-      btn.textContent = '上傳中...';
       status.textContent = '';
 
-      try {
-        const res = await fetch(GAS_WEB_APP_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            roomType,
-            userId: profile.userId,
-            userName: profile.displayName,
-            note: document.getElementById('noteInput').value.trim(),
-            imageBase64: compressedBase64
-          })
-        });
+      let successCount = 0;
+      let lastPerson = profile.displayName;
 
-        const result = await res.json();
-        if (result.success) {
-          status.textContent = result.message || '上傳完成！';
-          document.getElementById('photoInput').value = '';
-          document.getElementById('noteInput').value = '';
-          document.getElementById('preview').style.display = 'none';
-          document.querySelectorAll('input[name="roomType"]').forEach((el) => {
-            el.checked = false;
+      try {
+        for (let i = 0; i < compressedImages.length; i++) {
+          btn.textContent = `上傳中 (${i + 1}/${compressedImages.length})...`;
+          status.textContent = `正在上傳第 ${i + 1} / ${compressedImages.length} 張照片...`;
+
+          const res = await fetch(GAS_WEB_APP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              roomType,
+              userId: profile.userId,
+              userName: profile.displayName,
+              note,
+              photoIndex: i + 1,
+              photoTotal: compressedImages.length,
+              imageBase64: compressedImages[i]
+            })
           });
-          compressedBase64 = '';
-        } else {
-          status.textContent = result.message || '上傳失敗';
+
+          const result = await res.json();
+          if (!result.success) {
+            throw new Error(result.message || `第 ${i + 1} 張上傳失敗`);
+          }
+          successCount++;
+          if (result.realName) lastPerson = result.realName;
         }
+
+        status.textContent = `${roomType} 共 ${successCount} 張照片已記錄（人員：${lastPerson}）`;
+        document.getElementById('photoInput').value = '';
+        document.getElementById('noteInput').value = '';
+        document.getElementById('previewGrid').innerHTML = '';
+        document.querySelectorAll('input[name="roomType"]').forEach((el) => {
+          el.checked = false;
+        });
+        compressedImages = [];
       } catch (err) {
-        status.textContent = '連線失敗：' + err.message;
+        status.textContent = `已成功上傳 ${successCount} / ${compressedImages.length} 張，但發生錯誤：${err.message}`;
       } finally {
         btn.disabled = false;
         btn.textContent = '送出上傳';
